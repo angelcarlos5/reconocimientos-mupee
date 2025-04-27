@@ -1,14 +1,8 @@
 
 import streamlit as st
 import pandas as pd
-from sentence_transformers import SentenceTransformer, util
-
-# Cargar modelo
-@st.cache_resource
-def cargar_modelo():
-    return SentenceTransformer('all-MiniLM-L6-v2')
-
-modelo = cargar_modelo()
+from sklearn.feature_extraction.text import TfidfVectorizer
+from sklearn.metrics.pairwise import cosine_similarity
 
 # Cargar datos
 @st.cache_data
@@ -18,18 +12,14 @@ def cargar_datos():
 
 df = cargar_datos()
 
-# Crear embeddings para máster, universidad y asignatura cursada
-@st.cache_data
-def vectorizar_campos(df):
-    embeddings_master = modelo.encode(df["MÁSTER CURSADO"].tolist(), convert_to_tensor=True)
-    embeddings_universidad = modelo.encode(df["UNIVERSIDAD DE PROCEDENCIA"].tolist(), convert_to_tensor=True)
-    embeddings_asignatura = modelo.encode(df["ASIGNATURA CURSADA"].tolist(), convert_to_tensor=True)
-    return embeddings_master, embeddings_universidad, embeddings_asignatura
-
-embeddings_master, embeddings_universidad, embeddings_asignatura = vectorizar_campos(df)
+# Función de búsqueda usando TF-IDF
+def buscar_similitud(campo_usuario, columna_datos):
+    vectorizer = TfidfVectorizer().fit_transform([campo_usuario] + columna_datos.tolist())
+    similitudes = cosine_similarity(vectorizer[0:1], vectorizer[1:]).flatten()
+    return similitudes
 
 # App
-st.title("🎓 Asistente Inteligente de Reconocimiento MUPEE - VERSIÓN MEJORADA")
+st.title("🎓 Asistente Inteligente de Reconocimiento MUPEE - VERSIÓN LIGERA")
 
 tab1, tab2 = st.tabs(["🔎 Buscar reconocimiento", "🆕 Añadir nuevo reconocimiento"])
 
@@ -43,23 +33,20 @@ with tab1:
 
     if st.button("🔎 Buscar reconocimiento"):
         if asignatura_aportada:
-            embed_master_input = modelo.encode(master_cursado.upper(), convert_to_tensor=True)
-            embed_universidad_input = modelo.encode(universidad_origen.upper(), convert_to_tensor=True)
-            embed_asignatura_input = modelo.encode(asignatura_aportada.upper(), convert_to_tensor=True)
+            sim_master = buscar_similitud(master_cursado.upper(), df["MÁSTER CURSADO"])
+            sim_universidad = buscar_similitud(universidad_origen.upper(), df["UNIVERSIDAD DE PROCEDENCIA"])
+            sim_asignatura = buscar_similitud(asignatura_aportada.upper(), df["ASIGNATURA CURSADA"])
 
-            # Calcular similitudes
-            df["SIM_MASTER"] = util.cos_sim(embed_master_input, embeddings_master)[0].cpu().numpy()
-            df["SIM_UNIVERSIDAD"] = util.cos_sim(embed_universidad_input, embeddings_universidad)[0].cpu().numpy()
-            df["SIM_ASIGNATURA"] = util.cos_sim(embed_asignatura_input, embeddings_asignatura)[0].cpu().numpy()
+            df["SIM_MASTER"] = sim_master
+            df["SIM_UNIVERSIDAD"] = sim_universidad
+            df["SIM_ASIGNATURA"] = sim_asignatura
 
-            # Contar campos que cumplen similitud > 0.5
             df["COINCIDENCIAS"] = (
-                (df["SIM_MASTER"] > 0.5).astype(int) +
-                (df["SIM_UNIVERSIDAD"] > 0.5).astype(int) +
-                (df["SIM_ASIGNATURA"] > 0.5).astype(int)
+                (df["SIM_MASTER"] > 0.3).astype(int) +
+                (df["SIM_UNIVERSIDAD"] > 0.3).astype(int) +
+                (df["SIM_ASIGNATURA"] > 0.3).astype(int)
             )
 
-            # Filtrar registros que tienen al menos 2 coincidencias buenas
             df_filtrado = df[df["COINCIDENCIAS"] >= 2]
 
             if anio_academico:
@@ -75,12 +62,11 @@ with tab1:
                     "SIM_MASTER", "SIM_UNIVERSIDAD", "SIM_ASIGNATURA"
                 ]].reset_index(drop=True))
 
-                # Estadísticas
                 asignaturas_reconocidas = resultados["ASIGNATURA RECONOCIDA EN MUPEE"].nunique()
                 porcentaje = (asignaturas_reconocidas / len(resultados)) * 100
                 st.markdown(f"**📊 Porcentaje de asignaturas reconocidas respecto a coincidencias:** `{porcentaje:.1f}%`")
             else:
-                st.warning("❗ No se encontraron coincidencias suficientes con los datos aportados. Intenta ajustar los términos.")
+                st.warning("❗ No se encontraron coincidencias suficientes con los datos aportados.")
         else:
             st.error("Por favor, escribe al menos la asignatura aportada.")
 
