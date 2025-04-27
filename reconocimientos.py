@@ -27,6 +27,10 @@ if not st.session_state.autenticado:
 
 # --- Aplicación principal ---
 
+# Mostrar logotipo y título
+st.image("universidad-nebrija.JPG", width=500)
+st.title("🎓 Asistente Inteligente de Reconocimiento MUPEE")
+
 # Cargar datos
 @st.cache_data
 def cargar_datos():
@@ -40,9 +44,6 @@ def buscar_similitud(campo_usuario, columna_datos):
     vectorizer = TfidfVectorizer().fit_transform([campo_usuario] + columna_datos.tolist())
     similitudes = cosine_similarity(vectorizer[0:1], vectorizer[1:]).flatten()
     return similitudes
-
-# App
-st.title("🎓 Asistente Inteligente de Reconocimiento MUPEE - VERSIÓN LIGERA")
 
 tab1, tab2 = st.tabs(["🔎 Buscar reconocimiento", "🆕 Añadir nuevo reconocimiento"])
 
