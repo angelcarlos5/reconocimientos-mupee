@@ -4,6 +4,29 @@ import pandas as pd
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.metrics.pairwise import cosine_similarity
 
+# --- Login Setup ---
+usuarios_autorizados = {
+    "AngelCarlosNebrija": "InmayMaria"
+}
+
+if "autenticado" not in st.session_state:
+    st.session_state.autenticado = False
+
+if not st.session_state.autenticado:
+    st.title("🔒 Acceso a la Aplicación")
+    usuario = st.text_input("Usuario")
+    contrasena = st.text_input("Contraseña", type="password")
+    if st.button("Entrar"):
+        if usuario in usuarios_autorizados and usuarios_autorizados[usuario] == contrasena:
+            st.session_state.autenticado = True
+            st.success("Acceso concedido")
+            st.experimental_rerun()
+        else:
+            st.error("Usuario o contraseña incorrectos")
+    st.stop()
+
+# --- Aplicación principal ---
+
 # Cargar datos
 @st.cache_data
 def cargar_datos():
